@@ -1,3 +1,4 @@
+# !pip install markdown pyside6 PySide6-Addons PySide6-QtWebEngine
 import sys
 import os
 from PySide6.QtWidgets import (
