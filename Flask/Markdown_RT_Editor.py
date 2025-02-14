@@ -126,7 +126,7 @@ HTML_TEMPLATE = """
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    default_content = """# Welcome!
+    default_content = r"""# Welcome!
 
 ## Markdown Example
 - **Bold Text**
@@ -141,10 +141,20 @@ $$ \\int_0^\\infty x^2 dx $$
 
 Matrix:
 $$
-\\begin{bmatrix}
+\begin{bmatrix}
+a & b \\\\
+c & d \\\\
+e & f
+\end{bmatrix}
+$$
+
+More complex matrix (3x2 example):
+$$
+\begin{bmatrix}
 1 & 2 \\\\
-3 & 4
-\\end{bmatrix}
+3 & 4 \\\\
+5 & 6
+\end{bmatrix}
 $$
 
 ## Code Example
