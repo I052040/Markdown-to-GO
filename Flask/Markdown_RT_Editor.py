@@ -63,37 +63,32 @@ HTML_TEMPLATE = """
             border: 1px solid #ddd; border-radius: 5px;
         }
         h1 { text-align: center; margin: 20px 0; }
-        .copy-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; }
-        .exit-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; }
+        .tool-bar { display: flex; gap: 10px; justify-content: flex-start; margin-bottom: 10px; }
+        button { padding: 5px 10px; }
+        #editor { position: relative; }
+        .tool-bar-container { position: absolute; top: -50px; left: 0; }
     </style>
 </head>
 <body>
     <h1>Markdown Editor</h1>
     <div class="container">
         <div id="editor">
-            <i class="copy-btn fas fa-copy" onclick="copyText('editor-textarea')" title="Select & Copy"></i>
+            <div class="tool-bar-container">
+                <div class="tool-bar">
+                    <button onclick="selectAllText('editor-textarea')">Select All</button>
+                    <button onclick="copyAllText()">Copy All</button>
+                </div>
+            </div>
             <textarea id="editor-textarea" oninput="updatePreview()" placeholder="Input Markdown/LaTeX...">{{ content }}</textarea>
         </div>
-        <div id="preview">
-            <i class="copy-btn fas fa-copy" onclick="copyText('preview')" title="Select & Copy"></i>
-        </div>
+        <div id="preview"></div>
     </div>
-    <button class="exit-btn" onclick="shutdownServer()">Exit</button>
 
     <script>
         function updatedOnLoad() {
             updatePreview();
         }
         
-        function shutdownServer() {
-            if(confirm("Are you sure you want to exit and stop the server?")) {
-                fetch('/shutdown', {method: 'POST'})
-                    .then(response => response.text())
-                    .then(alert)
-                    .catch(err => console.error('Error during shutdown request:', err));
-            }
-        }
-
         marked.setOptions({
             breaks: true,
             highlight: function(code, lang) {
@@ -114,22 +109,17 @@ HTML_TEMPLATE = """
             }
         }
 
-        function copyText(elementId) {
+        function selectAllText(elementId) {
             const element = document.getElementById(elementId);
-            let textToCopy;
-            if (elementId === 'editor-textarea') {
-                element.select();
-                textToCopy = element.value;
-            } else {
-                const range = document.createRange();
-                range.selectNodeContents(element);
-                window.getSelection().removeAllRanges();
-                window.getSelection().addRange(range);
-                textToCopy = window.getSelection().toString();
-            }
+            element.select();
+        }
+
+        function copyAllText() {
+            const element = document.getElementById('editor-textarea');
+            element.select();
             try {
                 const successful = document.execCommand('copy');
-                alert(successful ? 'Copied!' : 'Copy failed');
+                alert(successful ? 'All text copied!' : 'Copy failed');
             } catch (err) {
                 alert('Browser does not support copying');
             }
@@ -208,4 +198,4 @@ $$
     return render_template_string(HTML_TEMPLATE, content=content)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
