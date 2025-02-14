@@ -1,4 +1,4 @@
-# Required packages: flask, markdown, requests
+# Required packages: flask, requests
 import os
 import requests
 from pathlib import Path
@@ -6,43 +6,47 @@ from flask import Flask, render_template_string, request
 
 app = Flask(__name__)
 
-# Static files directory structure
+# Static files directory structure and corresponding URLs
 static_dirs = {
     "js": ["marked.min.js", "highlight.min.js", "polyfill.min.js"],
     "css": ["highlight.default.min.css"],
     "mathjax/es5": ["tex-mml-chtml.js"]
 }
 
-for dir_name, files in static_dirs.items():
-    dir_path = Path("static") / dir_name
-    dir_path.mkdir(parents=True, exist_ok=True)
+file_urls = {
+    "marked.min.js": "https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js",
+    "highlight.min.js": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.0/highlight.min.js",
+    "polyfill.min.js": "https://polyfill.io/v3/polyfill.min.js?features=es6",
+    "highlight.default.min.css": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.0/styles/default.min.css",
+    "tex-mml-chtml.js": "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+}
 
-    # Check and download missing files
-    for filename in files:
-        file_urls = {
-            "marked.min.js": "https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js",
-            "highlight.min.js": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.0/highlight.min.js",
-            "polyfill.min.js": "https://polyfill.io/v3/polyfill.min.js?features=es6",
-            "highlight.default.min.css": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.0/styles/default.min.css",
-            "tex-mml-chtml.js": "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
-        }
+def ensure_static_files():
+    """Ensure all static files exist locally; download missing files."""
+    for dir_name, files in static_dirs.items():
+        dir_path = Path("static") / dir_name
+        dir_path.mkdir(parents=True, exist_ok=True)
 
-        file_path = dir_path / filename
-        if not file_path.exists():
-            print(f"Downloading {filename}...")
-            try:
-                response = requests.get(file_urls[filename])
-                response.raise_for_status()
-                with open(file_path, "wb") as f:
-                    f.write(response.content)
-            except Exception as e:
-                print(f"Download failed: {str(e)}")
+        for filename in files:
+            file_path = dir_path / filename
+            if not file_path.exists():
+                print(f"Downloading {filename}...")
+                try:
+                    response = requests.get(file_urls[filename])
+                    response.raise_for_status()
+                    with open(file_path, "wb") as f:
+                        f.write(response.content)
+                except Exception as e:
+                    print(f"Failed to download {filename}: {e}")
+
+# Check and prepare static files before running the app
+ensure_static_files()
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Markdown & LaTeX Editor</title>
+    <title>Markdown Editor</title>
     <script src="/static/js/marked.min.js"></script>
     <script src="/static/js/polyfill.min.js"></script>
     <script id="MathJax-script" async src="/static/mathjax/es5/tex-mml-chtml.js"></script>
@@ -52,9 +56,7 @@ HTML_TEMPLATE = """
 
     <style>
         .container { display: flex; gap: 20px; padding: 20px; }
-        #editor, #preview {
-            width: 45%; height: 80vh; position: relative;
-        }
+        #editor, #preview { width: 45%; height: 80vh; position: relative; }
         textarea, #preview {
             width: 100%; height: 100%;
             padding: 15px; font-family: monospace;
@@ -62,10 +64,11 @@ HTML_TEMPLATE = """
         }
         h1 { text-align: center; margin: 20px 0; }
         .copy-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; }
+        .exit-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <h1>Markdown & LaTeX Live Editor</h1>
+    <h1>Markdown Editor</h1>
     <div class="container">
         <div id="editor">
             <i class="copy-btn fas fa-copy" onclick="copyText('editor-textarea')" title="Select & Copy"></i>
@@ -75,8 +78,22 @@ HTML_TEMPLATE = """
             <i class="copy-btn fas fa-copy" onclick="copyText('preview')" title="Select & Copy"></i>
         </div>
     </div>
+    <button class="exit-btn" onclick="shutdownServer()">Exit</button>
 
     <script>
+        function updatedOnLoad() {
+            updatePreview();
+        }
+        
+        function shutdownServer() {
+            if(confirm("Are you sure you want to exit and stop the server?")) {
+                fetch('/shutdown', {method: 'POST'})
+                    .then(response => response.text())
+                    .then(alert)
+                    .catch(err => console.error('Error during shutdown request:', err));
+            }
+        }
+
         marked.setOptions({
             breaks: true,
             highlight: function(code, lang) {
@@ -118,27 +135,34 @@ HTML_TEMPLATE = """
             }
         }
 
-        window.onload = updatePreview;
+        window.onload = updatedOnLoad;
     </script>
 </body>
 </html>
 """
 
+def shutdown_server():
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+    func()
+    return 'Server shutting down...'
+
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    return shutdown_server()
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     default_content = r"""# Welcome!
-
 ## Markdown Example
 - **Bold Text**
 - *Italic Text*
 - [Link Example](https://example.com)
-
 ## LaTeX Example
 Inline formula \\( E = mc^2 \\)
-
 Block formula:
 $$ \\int_0^\\infty x^2 dx $$
-
 Matrix:
 $$
 \begin{bmatrix}
@@ -147,7 +171,6 @@ c & d \\\\
 e & f
 \end{bmatrix}
 $$
-
 More complex matrix (3x2 example):
 $$
 \begin{bmatrix}
@@ -156,35 +179,29 @@ $$
 5 & 6
 \end{bmatrix}
 $$
-
 ## Code Example
 ```python
 def hello_world():
     print("Hello, World!")
 ```
-
 ## Maxwell's Equations
 1. Gauss's Law:
 $$
 \\nabla \\cdot \\mathbf{E} = \\frac{\\rho}{\\varepsilon_0}
 $$
-
 2. Gauss's Law for Magnetism:
 $$
 \\nabla \\cdot \\mathbf{B} = 0
 $$
-
 3. Faraday's Law of Induction:
 $$
 \\nabla \\times \\mathbf{E} = -\\frac{\\partial \\mathbf{B}}{\\partial t}
 $$
-
 4. Ampère-Maxwell Law:
 $$
 \\nabla \\times \\mathbf{B} = \\mu_0 \\mathbf{J} + \\mu_0 \\varepsilon_0 \\frac{\\partial \\mathbf{E}}{\\partial t}
 $$
 """
-
     content = default_content
     if request.method == 'POST':
         content = request.form.get('content', default_content)
