@@ -1,4 +1,4 @@
-# 安装依赖：pip install flask markdown requests
+# Required packages: flask, markdown, requests
 import os
 import requests
 from pathlib import Path
@@ -6,7 +6,7 @@ from flask import Flask, render_template_string, request
 
 app = Flask(__name__)
 
-# 创建静态文件目录结构
+# Static files directory structure
 static_dirs = {
     "js": ["marked.min.js", "highlight.min.js", "polyfill.min.js"],
     "css": ["highlight.default.min.css"],
@@ -16,8 +16,8 @@ static_dirs = {
 for dir_name, files in static_dirs.items():
     dir_path = Path("static") / dir_name
     dir_path.mkdir(parents=True, exist_ok=True)
-    
-    # 检查并下载缺失文件
+
+    # Check and download missing files
     for filename in files:
         file_urls = {
             "marked.min.js": "https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js",
@@ -26,53 +26,57 @@ for dir_name, files in static_dirs.items():
             "highlight.default.min.css": "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.0/styles/default.min.css",
             "tex-mml-chtml.js": "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
         }
-        
+
         file_path = dir_path / filename
         if not file_path.exists():
-            print(f"正在下载 {filename}...")
+            print(f"Downloading {filename}...")
             try:
                 response = requests.get(file_urls[filename])
                 response.raise_for_status()
                 with open(file_path, "wb") as f:
                     f.write(response.content)
             except Exception as e:
-                print(f"下载失败: {str(e)}")
+                print(f"Download failed: {str(e)}")
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Markdown 实时编辑器</title>
+    <title>Markdown & LaTeX Editor</title>
     <script src="/static/js/marked.min.js"></script>
     <script src="/static/js/polyfill.min.js"></script>
     <script id="MathJax-script" async src="/static/mathjax/es5/tex-mml-chtml.js"></script>
     <link rel="stylesheet" href="/static/css/highlight.default.min.css">
     <script src="/static/js/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
     <style>
         .container { display: flex; gap: 20px; padding: 20px; }
-        #editor { 
-            width: 45%; height: 80vh; 
+        #editor, #preview {
+            width: 45%; height: 80vh; position: relative;
+        }
+        textarea, #preview {
+            width: 100%; height: 100%;
             padding: 15px; font-family: monospace;
             border: 1px solid #ddd; border-radius: 5px;
         }
-        #preview { 
-            width: 45%; height: 80vh; 
-            padding: 15px; overflow-y: auto;
-            border: 1px solid #ddd; border-radius: 5px;
-        }
-        .code-block { background: #f5f5f5; padding: 10px; }
         h1 { text-align: center; margin: 20px 0; }
+        .copy-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <h1>Markdown 实时编辑器</h1>
+    <h1>Markdown & LaTeX Live Editor</h1>
     <div class="container">
-        <textarea id="editor" oninput="updatePreview()" placeholder="输入 Markdown/LaTeX...">{{ content }}</textarea>
-        <div id="preview"></div>
+        <div id="editor">
+            <i class="copy-btn fas fa-copy" onclick="copyText('editor-textarea')" title="Select & Copy"></i>
+            <textarea id="editor-textarea" oninput="updatePreview()" placeholder="Input Markdown/LaTeX...">{{ content }}</textarea>
+        </div>
+        <div id="preview">
+            <i class="copy-btn fas fa-copy" onclick="copyText('preview')" title="Select & Copy"></i>
+        </div>
     </div>
 
     <script>
-        // 配置Markdown解析器
         marked.setOptions({
             breaks: true,
             highlight: function(code, lang) {
@@ -80,28 +84,40 @@ HTML_TEMPLATE = """
             }
         });
 
-        // 初始化加载内容
-        let isFirstLoad = true;
-        
         function updatePreview() {
-            const content = document.getElementById('editor').value;
+            const content = document.getElementById('editor-textarea').value;
             const parsed = marked.parse(content);
             document.getElementById('preview').innerHTML = parsed;
-            
-            // 首次加载时初始化代码高亮
-            if (isFirstLoad) {
-                hljs.highlightAll();
-                isFirstLoad = false;
-            }
-            
-            // 数学公式渲染
+
+            hljs.highlightAll();
+
             if (typeof MathJax !== 'undefined') {
                 MathJax.typesetClear();
                 MathJax.typesetPromise();
             }
         }
 
-        // 初始化预览
+        function copyText(elementId) {
+            const element = document.getElementById(elementId);
+            let textToCopy;
+            if (elementId === 'editor-textarea') {
+                element.select();
+                textToCopy = element.value;
+            } else {
+                const range = document.createRange();
+                range.selectNodeContents(element);
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range);
+                textToCopy = window.getSelection().toString();
+            }
+            try {
+                const successful = document.execCommand('copy');
+                alert(successful ? 'Copied!' : 'Copy failed');
+            } catch (err) {
+                alert('Browser does not support copying');
+            }
+        }
+
         window.onload = updatePreview;
     </script>
 </body>
@@ -110,20 +126,20 @@ HTML_TEMPLATE = """
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    default_content = """# 欢迎使用！
+    default_content = """# Welcome!
 
-## Markdown 示例
-- **加粗文字**
-- *斜体文字*
-- [链接示例](https://example.com)
+## Markdown Example
+- **Bold Text**
+- *Italic Text*
+- [Link Example](https://example.com)
 
-## LaTeX 示例
-行内公式 \\( E = mc^2 \\)
+## LaTeX Example
+Inline formula \\( E = mc^2 \\)
 
-块级公式：
+Block formula:
 $$ \\int_0^\\infty x^2 dx $$
 
-矩阵：
+Matrix:
 $$
 \\begin{bmatrix}
 1 & 2 \\\\
@@ -131,12 +147,34 @@ $$
 \\end{bmatrix}
 $$
 
-## 代码示例
+## Code Example
 ```python
 def hello_world():
     print("Hello, World!")
-```"""
-    
+```
+
+## Maxwell's Equations
+1. Gauss's Law:
+$$
+\\nabla \\cdot \\mathbf{E} = \\frac{\\rho}{\\varepsilon_0}
+$$
+
+2. Gauss's Law for Magnetism:
+$$
+\\nabla \\cdot \\mathbf{B} = 0
+$$
+
+3. Faraday's Law of Induction:
+$$
+\\nabla \\times \\mathbf{E} = -\\frac{\\partial \\mathbf{B}}{\\partial t}
+$$
+
+4. Ampère-Maxwell Law:
+$$
+\\nabla \\times \\mathbf{B} = \\mu_0 \\mathbf{J} + \\mu_0 \\varepsilon_0 \\frac{\\partial \\mathbf{E}}{\\partial t}
+$$
+"""
+
     content = default_content
     if request.method == 'POST':
         content = request.form.get('content', default_content)
