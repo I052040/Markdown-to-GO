@@ -47,86 +47,108 @@ HTML_TEMPLATE = """
 <html>
 <head>
     <title>Markdown Editor</title>
+    <!-- Load required JS and CSS for markdown and LaTeX rendering -->
     <script src="/static/js/marked.min.js"></script>
     <script src="/static/js/polyfill.min.js"></script>
     <script id="MathJax-script" async src="/static/mathjax/es5/tex-mml-chtml.js"></script>
     <link rel="stylesheet" href="/static/css/highlight.default.min.css">
     <script src="/static/js/highlight.min.js"></script>
+    <!-- FontAwesome for any icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-
     <style>
+        /* Basic layout and styling */
         .container { display: flex; gap: 20px; padding: 20px; }
-        #editor, #preview { width: 45%; height: 80vh; position: relative; }
+        #editor, #preview-container { flex: 1; height: 80vh; }
         textarea, #preview {
-            width: 100%; height: 100%;
-            padding: 15px; font-family: monospace;
-            border: 1px solid #ddd; border-radius: 5px;
+            height: 100%;
+            width: 100%;
+            padding: 15px;
+            font-family: monospace;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: auto;
+            resize: both;
+            box-sizing: border-box;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
-        h1 { text-align: center; margin: 20px 0; }
+        h1 { margin: 0; }
+        .tool-bar-container { position: relative; padding-top: 60px; }
         .tool-bar { display: flex; gap: 10px; justify-content: flex-start; margin-bottom: 10px; }
+        .title-container { position: absolute; top: 0; width: 100%; text-align: center; }
         button { padding: 5px 10px; }
-        #editor { position: relative; }
-        .tool-bar-container { position: absolute; top: -50px; left: 0; }
     </style>
-</head>
-<body>
-    <h1>Markdown Editor</h1>
-    <div class="container">
-        <div id="editor">
-            <div class="tool-bar-container">
-                <div class="tool-bar">
-                    <button onclick="selectAllText('editor-textarea')">Select All</button>
-                    <button onclick="copyAllText()">Copy All</button>
-                </div>
-            </div>
-            <textarea id="editor-textarea" oninput="updatePreview()" placeholder="Input Markdown/LaTeX...">{{ content }}</textarea>
-        </div>
-        <div id="preview"></div>
-    </div>
-
     <script>
-        function updatedOnLoad() {
-            updatePreview();
-        }
-        
-        marked.setOptions({
-            breaks: true,
-            highlight: function(code, lang) {
-                return hljs.highlightAuto(code).value;
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('editor-textarea').addEventListener('drop', handleFileSelect);
+
+        function handleFileSelect(event) {
+            event.preventDefault();
+            const files = event.dataTransfer.files;
+            if (files.length) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('editor-textarea').value = e.target.result;
+                    updatePreview();
+                };
+                reader.readAsText(files[0]);
             }
-        });
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+        }
 
         function updatePreview() {
-            const content = document.getElementById('editor-textarea').value;
-            const parsed = marked.parse(content);
-            document.getElementById('preview').innerHTML = parsed;
-
-            hljs.highlightAll();
-
-            if (typeof MathJax !== 'undefined') {
-                MathJax.typesetClear();
-                MathJax.typesetPromise();
-            }
+            const markdownText = document.getElementById('editor-textarea').value;
+            const preview = document.getElementById('preview');
+            preview.innerHTML = marked.parse(markdownText);
+            document.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightBlock(block);
+            });
+            MathJax.typesetPromise([preview]);
         }
 
-        function selectAllText(elementId) {
-            const element = document.getElementById(elementId);
-            element.select();
-        }
+        document.getElementById('clear-button').addEventListener('click', function() {
+            document.getElementById('editor-textarea').value = '';
+            updatePreview();
+        });
 
-        function copyAllText() {
-            const element = document.getElementById('editor-textarea');
-            element.select();
-            try {
-                const successful = document.execCommand('copy');
-                alert(successful ? 'All text copied!' : 'Copy failed');
-            } catch (err) {
-                alert('Browser does not support copying');
-            }
-        }
-
-        window.onload = updatedOnLoad;
+        document.getElementById('save-button').addEventListener('click', function() {
+            const markdownContent = document.getElementById('editor-textarea').value;
+            const blob = new Blob([markdownContent], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'output.md';  // Default filename
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    });
     </script>
+</head>
+<body>
+    <div class="tool-bar-container">
+        <div class="title-container">
+            <h1>Markdown Editor</h1>
+        </div>
+        <div class="tool-bar">
+            <input type="file" id="file-input" style="display: none;" onchange="handleFileSelect(event)">
+            <button onclick="document.getElementById('file-input').click()">Open File</button>
+            <button id="clear-button">Clear All</button>
+            <button id="save-button">Save As</button>
+        </div>
+    </div>
+    <div class="container">
+        <div id="editor">
+            <textarea id="editor-textarea" oninput="updatePreview()" ondrop="handleFileSelect(event)" ondragover="handleDragOver(event)" placeholder="Input Markdown/LaTeX...">{{ content }}</textarea>
+        </div>
+        <div id="preview-container">
+            <div id="preview"></div>
+        </div>
+    </div>
 </body>
 </html>
 """
@@ -149,10 +171,13 @@ def index():
 - **Bold Text**
 - *Italic Text*
 - [Link Example](https://example.com)
+
 ## LaTeX Example
 Inline formula \\( E = mc^2 \\)
+
 Block formula:
 $$ \\int_0^\\infty x^2 dx $$
+
 Matrix:
 $$
 \begin{bmatrix}
@@ -161,6 +186,7 @@ c & d \\\\
 e & f
 \end{bmatrix}
 $$
+
 More complex matrix (3x2 example):
 $$
 \begin{bmatrix}
@@ -169,33 +195,14 @@ $$
 5 & 6
 \end{bmatrix}
 $$
+
 ## Code Example
 ```python
 def hello_world():
     print("Hello, World!")
 ```
-## Maxwell's Equations
-1. Gauss's Law:
-$$
-\\nabla \\cdot \\mathbf{E} = \\frac{\\rho}{\\varepsilon_0}
-$$
-2. Gauss's Law for Magnetism:
-$$
-\\nabla \\cdot \\mathbf{B} = 0
-$$
-3. Faraday's Law of Induction:
-$$
-\\nabla \\times \\mathbf{E} = -\\frac{\\partial \\mathbf{B}}{\\partial t}
-$$
-4. Ampère-Maxwell Law:
-$$
-\\nabla \\times \\mathbf{B} = \\mu_0 \\mathbf{J} + \\mu_0 \\varepsilon_0 \\frac{\\partial \\mathbf{E}}{\\partial t}
-$$
 """
-    content = default_content
-    if request.method == 'POST':
-        content = request.form.get('content', default_content)
-    return render_template_string(HTML_TEMPLATE, content=content)
+    return render_template_string(HTML_TEMPLATE, content=default_content)
 
 if __name__ == '__main__':
     app.run(debug=False)
