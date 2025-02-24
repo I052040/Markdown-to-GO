@@ -1,4 +1,3 @@
-# Required packages: flask, requests
 import os
 import requests
 from pathlib import Path
@@ -53,7 +52,6 @@ HTML_TEMPLATE = """
     <script id="MathJax-script" async src="/static/mathjax/es5/tex-mml-chtml.js"></script>
     <link rel="stylesheet" href="/static/css/highlight.default.min.css">
     <script src="/static/js/highlight.min.js"></script>
-    <!-- FontAwesome for any icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         /* Basic layout and styling */
@@ -106,15 +104,23 @@ HTML_TEMPLATE = """
             event.preventDefault();
         }
 
-        function updatePreview() {
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        const updatePreview = debounce(function() {
             const markdownText = document.getElementById('editor-textarea').value;
             const preview = document.getElementById('preview');
             preview.innerHTML = marked.parse(markdownText);
             document.querySelectorAll('pre code').forEach((block) => {
-                hljs.highlightBlock(block);
+                hljs.highlightElement(block);
             });
             MathJax.typesetPromise([preview]);
-        }
+        }, 200);
 
         document.getElementById('clear-button').addEventListener('click', function() {
             document.getElementById('editor-textarea').value = '';
@@ -213,9 +219,10 @@ $$
 ```python
 def hello_world():
     print("Hello, World!")
-```
-"""
-    return render_template_string(HTML_TEMPLATE, content=default_content)
+```"""
+
+    content = request.form.get("markdown", default_content)
+    return render_template_string(HTML_TEMPLATE, content=content)
 
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(debug=True)
