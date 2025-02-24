@@ -80,18 +80,25 @@ HTML_TEMPLATE = """
     </style>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
+        let currentFileName = ""; // Variable to store current file name if drag-and-drop
+
         document.getElementById('editor-textarea').addEventListener('drop', handleFileSelect);
+        document.getElementById('editor-textarea').addEventListener('paste', function() {
+            currentFileName = ""; // Reset file name on paste
+        });
 
         function handleFileSelect(event) {
             event.preventDefault();
             const files = event.dataTransfer.files;
             if (files.length) {
+                const file = files[0];
+                currentFileName = file.name; // Store file name
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     document.getElementById('editor-textarea').value = e.target.result;
                     updatePreview();
                 };
-                reader.readAsText(files[0]);
+                reader.readAsText(file);
             }
         }
 
@@ -116,11 +123,12 @@ HTML_TEMPLATE = """
 
         document.getElementById('save-button').addEventListener('click', function() {
             const markdownContent = document.getElementById('editor-textarea').value;
+            let fileName = currentFileName || 'output.md'; // Use current file name or default to 'output.md'
             const blob = new Blob([markdownContent], { type: 'text/markdown' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'output.md';  // Default filename
+            a.download = fileName;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
