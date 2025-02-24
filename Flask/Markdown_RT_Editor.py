@@ -80,11 +80,11 @@ HTML_TEMPLATE = """
     </style>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        let currentFileName = ""; // Variable to store current file name if drag-and-drop
+        let currentFileName = ""; // Variable to store the current file name if drag-and-drop
 
         document.getElementById('editor-textarea').addEventListener('drop', handleFileSelect);
         document.getElementById('editor-textarea').addEventListener('paste', function() {
-            currentFileName = ""; // Reset file name on paste
+            currentFileName = ""; // Reset the file name on paste
         });
 
         function handleFileSelect(event) {
@@ -134,6 +134,11 @@ HTML_TEMPLATE = """
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         });
+
+        // Initial content update
+        updatePreview();
+
+        document.getElementById('editor-textarea').addEventListener('input', updatePreview);
     });
     </script>
 </head>
@@ -146,12 +151,12 @@ HTML_TEMPLATE = """
             <input type="file" id="file-input" style="display: none;" onchange="handleFileSelect(event)">
             <button onclick="document.getElementById('file-input').click()">Open File</button>
             <button id="clear-button">Clear All</button>
-            <button id="save-button">Save As</button>
+            <button id="save-button">Save File</button>
         </div>
     </div>
     <div class="container">
         <div id="editor">
-            <textarea id="editor-textarea" oninput="updatePreview()" ondrop="handleFileSelect(event)" ondragover="handleDragOver(event)" placeholder="Input Markdown/LaTeX...">{{ content }}</textarea>
+            <textarea id="editor-textarea" placeholder="Input Markdown/LaTeX...">{{ content }}</textarea>
         </div>
         <div id="preview-container">
             <div id="preview"></div>
@@ -188,20 +193,20 @@ $$ \\int_0^\\infty x^2 dx $$
 
 Matrix:
 $$
-\begin{bmatrix}
+\\begin{bmatrix}
 a & b \\\\
 c & d \\\\
 e & f
-\end{bmatrix}
+\\end{bmatrix}
 $$
 
 More complex matrix (3x2 example):
 $$
-\begin{bmatrix}
+\\begin{bmatrix}
 1 & 2 \\\\
 3 & 4 \\\\
 5 & 6
-\end{bmatrix}
+\\end{bmatrix}
 $$
 
 ## Code Example
